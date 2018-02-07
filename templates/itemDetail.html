@@ -1,0 +1,35 @@
+{% extends "base.html" %} {% block content %}
+{% if movie %}
+<div class="mdl-card auto-margin mdl-textfield--full-width form-grid mdl-shadow--3dp margin-bottom-10 mdl-color--white margin-top-10">
+    <div class="mdl-grid margin-0 mdl-textfield--full-width justify-start padding-0">
+        <div class=" mdl-cell--3-col mdl-cell--1-offset-desktop mdl-cell--6-col-phone mdl-cell--8-col-tablet  mdl-typography--text-center">
+            <img src="{{movie.trailerUrl}}" alt="Trailer" class="movie-trailer-detail" />
+        </div>
+        <div class=" mdl-cell--7-col mdl-cell--8-col-phone auto-margin movie-header">
+            <h1 class="movie-title">{{movie.movieName}}</h1>
+
+            <div>
+                <span class="director-movie-detail">{{movie.director}}</span>
+            </div>
+            <div class="action-button">
+                <button class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect mdl-color--white mdl-color-text--purple-A700 button-edit" onclick="location.href='{{url_for('editMovieDetails', category = movie.category, movieId = movie.id)}}'">Edit Movie Details</button>
+                <button class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect mdl-color--purple-A700 mdl-color-text--white button-delete" onclick="location.href='{{url_for('deleteMovie', category = movie.category, movieId = movie.id)}}'">Delete Movie</button>
+            </div>
+        </div>
+
+    </div>
+    <hr class="detail-content-line" />
+
+    <div class="movie-description">
+        <div class="description-content margin-bottom-10">
+            {{movie.description|safe}}
+        </div>
+
+    </div>
+
+</div>
+{% else %}
+  <span align="center" class="no-movie-msg">Sorry! No Movie in Database With This Genre :(</span>
+{% endif %}
+
+{% endblock %}

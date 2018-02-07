@@ -29,7 +29,7 @@ class MoviesDB(Base):
     id = Column(Integer, primary_key=True)
     movieName = Column(String(250), nullable=False)
     director = Column(String(250), nullable=False)
-    trilerUrl = Column(String(450), nullable=False)
+    trailerUrl = Column(String(450), nullable=False)
     description = Column(String(), nullable=False)
     category = Column(String(100), nullable=False)
     user_id = Column(Integer, ForeignKey('user.id'))
@@ -41,11 +41,11 @@ class MoviesDB(Base):
         return {
             'id': self.id,
             'name': self.movieName,
-            'author': self.director,
+            'director': self.director,
             'genre': self.category,
-            'trilerUrl': self.trilerUrl,
+            'trailerUrl': self.trailerUrl,
             'description': self.description
         }
 
-engine = create_engine('sqlite:///MovieCatalog.db')
+engine = create_engine('sqlite:///MoviesCatalog.db')
 Base.metadata.create_all(engine)
