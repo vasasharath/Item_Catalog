@@ -6,14 +6,14 @@
     <div class="demo-card-wide mdl-card mdl-shadow--8dp">
 
         <div class="mdl-card__title brighten" title="{{movie.movieName}}" style="background: url('{{ movie.trailerUrl }}') center / cover;">
-            <a href="{{url_for('movieDetail',category = movie.category, movieId = movie.id)}}"></a>
+            <a href="{{url_for('movieDetails',category = movie.category, movieId = movie.id)}}"></a>
         </div>
 
         <div class="mdl-card__actions mdl-card--border">
 
-            <a href="{{url_for('movieDetail',category = movie.category, movieId = movie.id)}}" title="{{ movie.movieName }}" tabindex="-1" class="link-fade"> <span>{{ movie.movieName }}</span><span class="span-fade"></span></a>
+            <a href="{{url_for('movieDetails',category = movie.category, movieId = movie.id)}}" title="{{ movie.movieName }}" tabindex="-1" class="link-fade"> <span>{{ movie.movieName }}</span><span class="span-fade"></span></a>
 
-            <a href="{{url_for('movieDetail',category = movie.category, movieId = movie.id)}}" title="{{ movie.director }}" class="director-movie">{{ movie.director }}</a>
+            <a href="{{url_for('movieDetails',category = movie.category, movieId = movie.id)}}" title="{{ movie.director }}" class="director-movie">{{ movie.director }}</a>
         </div>
     </div>
     {% else %}
