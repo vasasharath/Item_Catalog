@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-xs-8 col-xs-offset-2">
+            <div class="panel panel-primary">
+                <div class="panel-heading">{{ movie.name }}</div>
+                <div class="panel-body">
+                    <div class="text-center">
+                        <img src="{{ movie.image_url }}" alt="{{ movie.name }}" class="img-responsive">
+                    </div>
+                    <p class="lead">{{ movie.name }}</p>
+                    <p>{{ movie.description }}</p>
+                </div>
+                <div class="panel-footer text-right">
+                    <a href="{{ url_for('edit_movie', movie_id=movie.id) }}" class="btn btn-primary">Edit</a>
+                    <a href="{{ url_for('delete_movie', movie_id=movie.id) }}" class="btn btn-danger">Delete</a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

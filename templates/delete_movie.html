@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-xs-8 col-xs-offset-2">
+            <div class="panel panel-primary">
+                <div class="panel-heading">Delete `{{ movie.name }}` Movies</div>
+                <form method="post">
+                    <div class="panel-body">Are your sure you want to delete?</div>
+                    <div class="panel-footer">
+                        <a href="{{ url_for('view_movie', movie_id=movie.id) }}" class="btn btn-link">Cancel</a>
+                        <button type="submit" class="btn btn-danger pull-right">Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

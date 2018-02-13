@@ -1,530 +1,439 @@
-#!/usr/bin/python
-from flask import Flask, render_template, request, redirect, url_for, \
-    flash, jsonify
-from flask import session as login_session
-from flask import make_response
+from functools import wraps
 
-# importing SqlAlchemy
+from flask import Flask, render_template, redirect, url_for, flash, request, jsonify
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from database_setup import Base, MoviesDB, User
+from database_setup import Base, User, Category, Movies
+
+from flask import session as login_session
 import random
 import string
+from oauth2client.client import flow_from_clientsecrets
+from oauth2client.client import FlowExchangeError
+from flask import make_response, jsonify
 import httplib2
 import json
 import requests
 
-# importing oauth
-
-from oauth2client.client import flow_from_clientsecrets
-from oauth2client.client import FlowExchangeError
-from oauth2client.client import AccessTokenCredentials
-
-# app configuration
-
 app = Flask(__name__)
-app.secret_key = 'itsasecret'
 
-# google client secret
-secret_file = json.loads(open('client_secrets.json', 'r').read())
-CLIENT_ID = secret_file['web']['client_id']
-APPLICATION_NAME = 'Item-Catalog'
-
-# Bind the engine to the metadata of the Base class so that the
-# declaratives can be accessed through a DBSession instance
-
-engine = create_engine('sqlite:///MoviesCatalog.db')
+engine = create_engine('sqlite:///movie-catalog.db')
 Base.metadata.bind = engine
-
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
-
-# validating current loggedin user
-
-def check_user():
-    email = login_session['email']
-    return session.query(User).filter_by(email=email).one_or_none()
+# Google+ client id and application name
+CLIENT_ID = json.loads(
+    open('client_secrets.json', 'r').read())['web']['client_id']
+APPLICATION_NAME = "Movie-Catalog"
 
 
-# retreive admin user details
-
-def check_admin():
-    return session.query(User).filter_by(
-        email='sharathvasa@gmail.com').one_or_none()
-
-
-# Add new user into database
-
-def createUser():
-    name = login_session['name']
-    email = login_session['email']
-    url = login_session['img']
-    provider = login_session['provider']
-    newUser = User(name=name, email=email, image=url, provider=provider)
-    session.add(newUser)
+def createUser(login_session):
+    u = User(
+        name=login_session['username'],
+        email=login_session['email'],
+        image=login_session['image'])
+    session.add(u)
     session.commit()
+    user = session.query(User).filter_by(email=login_session['email']).one()
+    return user.id
 
 
-def new_state():
-    state = ''.join(random.choice(string.ascii_uppercase +
-                    string.digits) for x in xrange(32))
+def getUserInfo(user_id):
+    user = session.query(User).filter_by(id=user_id).one()
+    return user
+
+
+def getUserID(email):
+    try:
+        user = session.query(User).filter_by(email=email).one()
+        return user.id
+    except:
+        return None
+
+
+def user_allowed_to_browse():
+    return 'email' in login_session
+
+
+def user_allowed_to_edit(m):
+    return ('user_id' in login_session and
+            m.user_id == login_session['user_id'])
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'email' in login_session:
+            return f(*args, **kwargs)
+        else:
+            flash('You are not allowed to access there', 'danger')
+            return redirect('/login')
+
+    return decorated_function
+
+
+@app.context_processor
+def inject_user_logged_in():
+    return dict(user_logged_in=user_allowed_to_browse())
+
+
+@app.route('/login')
+def showLogin():
+    """
+    Open login page contains google signin button
+    """
+    state = ''.join(random.choice(string.ascii_uppercase + string.digits)
+                    for x in xrange(32))
     login_session['state'] = state
-    return state
+    # return "The current session state is %s" % login_session['state']
+    return render_template('login.html', STATE=state)
 
-
-def queryAllMovies():
-    return session.query(MoviesDB).all()
-
-
-# App Routes
-
-# main page
-
-@app.route('/')
-@app.route('/movies/')
-def showMovies():
-    movies = queryAllMovies()
-    state = new_state()
-    return render_template('main.html', movies=movies, currentPage='main',
-                           state=state, login_session=login_session)
-
-
-# To add new movie
-
-@app.route('/movies/new/', methods=['GET', 'POST'])
-def newMovie():
-    if request.method == 'POST':
-
-        # check if user is logged in or not
-
-        if 'provider' in login_session and \
-                    login_session['provider'] != 'null':
-            movieName = request.form['movieName']
-            director = request.form['director']
-            trailerUrl = request.form['trailerUrl']
-            description = request.form['description']
-            description = description.replace('\n', '<br>')
-            movieCategory = request.form['category']
-            user_id = check_user().id
-
-            if movieName and director and trailerUrl and description \
-                    and movieCategory:
-                newMovie = MoviesDB(
-                    movieName=movieName,
-                    director=director,
-                    trailerUrl=trailerUrl,
-                    description=description,
-                    category=category,
-                    user_id=user_id,
-                    )
-                session.add(newMovie)
-                session.commit()
-                return redirect(url_for('showMovies'))
-            else:
-                state = new_state()
-                return render_template(
-                    'newItem.html',
-                    currentPage='new',
-                    title='Add New Movie',
-                    errorMsg='All Fields are Required!',
-                    state=state,
-                    login_session=login_session,
-                    )
-        else:
-            state = new_state()
-            movies = queryAllMovies()
-            return render_template(
-                'main.html',
-                movies=movies,
-                currentPage='main',
-                state=state,
-                login_session=login_session,
-                errorMsg='Please Login first to Add Movie!',
-                )
-    elif 'provider' in login_session and login_session['provider'] \
-            != 'null':
-        state = new_state()
-        return render_template('newItem.html', currentPage='new',
-                               title='Add New Movie', state=state,
-                               login_session=login_session)
-    else:
-        state = new_state()
-        movies = queryAllMovies()
-        return render_template(
-            'main.html',
-            movies=movies,
-            currentPage='main',
-            state=state,
-            login_session=login_session,
-            errorMsg='Please Login first to Add Movie!',
-            )
-
-
-# To show movies of different categories
-
-@app.route('/movies/category/<string:category>/')
-def sortMovies(category):
-    movies = session.query(MoviesDB).filter_by(category=category).all()
-    state = new_state()
-    return render_template(
-        'main.html',
-        movies=movies,
-        currentPage='main',
-        error='Sorry! No Movie in Database With This Genre :(',
-        state=state,
-        login_session=login_session)
-
-
-# To show movie details
-
-@app.route('/movies/category/<string:category>/<int:movieId>/')
-def movieDetails(category, movieId):
-    movie = session.query(MoviesDB).filter_by(id=movieId,
-                                           category=category).first()
-    state = new_state()
-    if movie:
-        return render_template('itemDetail.html', movie=movie,
-                               currentPage='detail', state=state,
-                               login_session=login_session)
-    else:
-        return render_template('main.html', currentPage='main',
-                               error="""No Movie Found with this Category
-                               and Movie Id :(""",
-                               state=state,
-                               login_session=login_session)
-
-
-# To edit movie details
-
-@app.route('/movies/category/<string:category>/<int:movieId>/edit/',
-           methods=['GET', 'POST'])
-def editMovieDetails(category, movieId):
-    movie = session.query(MoviesDB).filter_by(id=movieId,
-                                           category=category).first()
-    if request.method == 'POST':
-
-        # check if user is logged in or not
-
-        if 'provider' in login_session and login_session['provider'] \
-                != 'null':
-            movieName = request.form['movieName']
-            director = request.form['director']
-            trailerUrl = request.form['trailerUrl']
-            description = request.form['description']
-            category = request.form['category']
-            user_id = check_user().id
-            admin_id = check_admin().id
-
-            # check if movie owner is same as logged in user or admin or not
-
-            if movie.user_id == user_id or user_id == admin_id:
-                if movieName and director and trailerUrl and description \
-                        and category:
-                    movie.movieName = movieName
-                    movie.director = director
-                    movie.trailerUrl = trailerUrl
-                    description = description.replace('\n', '<br>')
-                    movie.description = description
-                    movie.category = category
-                    session.add(movie)
-                    session.commit()
-                    return redirect(url_for('movieDetails',
-                                    category=movie.category,
-                                    movieId=movie.id))
-                else:
-                    state = new_state()
-                    return render_template(
-                        'editItem.html',
-                        currentPage='edit',
-                        title='Edit movie Details',
-                        movie=movie,
-                        state=state,
-                        login_session=login_session,
-                        errorMsg='All Fields are Required!',
-                        )
-            else:
-                state = new_state()
-                return render_template(
-                    'itemDetail.html',
-                    movie=movie,
-                    currentPage='detail',
-                    state=state,
-                    login_session=login_session,
-                    errorMsg='Sorry! The Owner can only edit movie Details!')
-        else:
-            state = new_state()
-            return render_template(
-                'itemDetail.html',
-                movie=movie,
-                currentPage='detail',
-                state=state,
-                login_session=login_session,
-                errorMsg='Please Login to Edit the movie Details!',
-                )
-    elif movie:
-        state = new_state()
-        if 'provider' in login_session and login_session['provider'] \
-                != 'null':
-            user_id = check_user().id
-            admin_id = check_admin().id
-            if user_id == movie.user_id or user_id == admin_id:
-                movie.description = movie.description.replace('<br>', '\n')
-                return render_template(
-                    'editItem.html',
-                    currentPage='edit',
-                    title='Edit movie Details',
-                    movie=movie,
-                    state=state,
-                    login_session=login_session,
-                    )
-            else:
-                return render_template(
-                    'itemDetail.html',
-                    movie=movie,
-                    currentPage='detail',
-                    state=state,
-                    login_session=login_session,
-                    errorMsg='Sorry! The Owner can only edit movie Details!')
-        else:
-            return render_template(
-                'itemDetail.html',
-                movie=movie,
-                currentPage='detail',
-                state=state,
-                login_session=login_session,
-                errorMsg='Please Login to Edit the Movie Details!',
-                )
-    else:
-        state = new_state()
-        return render_template('main.html', currentPage='main',
-                               error="""Error Editing Movie! No Movie Found
-                               with this Category and Movie Id :(""",
-                               state=state,
-                               login_session=login_session)
-
-
-# To delete movies
-
-@app.route('/movies/category/<string:category>/<int:movieId>/delete/')
-def deleteMovie(category, movieId):
-    movie = session.query(MoviesDB).filter_by(category=category,
-                                           id=movieId).first()
-    state = new_state()
-    if movie:
-
-        # check if user is logged in or not
-
-        if 'provider' in login_session and login_session['provider'] \
-                != 'null':
-            user_id = check_user().id
-            admin_id = check_admin().id
-            if user_id == movie.user_id or user_id == admin_id:
-                session.delete(movie)
-                session.commit()
-                return redirect(url_for('showMovies'))
-            else:
-                return render_template(
-                    'itemDetail.html',
-                    movie=movie,
-                    currentPage='detail',
-                    state=state,
-                    login_session=login_session,
-                    errorMsg='Sorry! Only the Owner Can delete the movie'
-                    )
-        else:
-            return render_template(
-                'itemDetail.html',
-                movie=movie,
-                currentPage='detail',
-                state=state,
-                login_session=login_session,
-                errorMsg='Please Login to Delete the Movie!',
-                )
-    else:
-        return render_template('main.html', currentPage='main',
-                               error="""Error Deleting Movie! No Movie Found
-                               with this Category and Movie Id :(""",
-                               state=state,
-                               login_session=login_session)
-
-
-# JSON Endpoints
-
-@app.route('/movies.json/')
-def moviesJSON():
-    movies = session.query(MoviesDB).all()
-    return jsonify(Movies=[movie.serialize for movie in movies])
-
-
-@app.route('/movies/category/<string:category>.json/')
-def movieCategoryJSON(category):
-    movies = session.query(MoviesDB).filter_by(category=category).all()
-    return jsonify(Movies=[movie.serialize for movie in movies])
-
-
-@app.route('/movies/category/<string:category>/<int:movieId>.json/')
-def movieJSON(category, movieId):
-    movie = session.query(MoviesDB).filter_by(category=category,
-                                           id=movieId).first()
-    return jsonify(Movie=movie.serialize)
-
-
-# google signin function
 
 @app.route('/gconnect', methods=['POST'])
-def gConnect():
+def gconnect():
+    """
+    Connect google account.
+    """
+    # Validate state token
     if request.args.get('state') != login_session['state']:
-        response.make_response(json.dumps('Invalid State paramenter'),
-                               401)
+        response = make_response(json.dumps('Invalid state parameter.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
-
     # Obtain authorization code
-
     code = request.data
+
     try:
-
         # Upgrade the authorization code into a credentials object
-
-        oauth_flow = flow_from_clientsecrets('client_secrets.json',
-                                             scope='')
+        oauth_flow = flow_from_clientsecrets('client_secrets.json', scope='')
         oauth_flow.redirect_uri = 'postmessage'
         credentials = oauth_flow.step2_exchange(code)
     except FlowExchangeError:
-        response = make_response(json.dumps("""Failed to upgrade the
-        authorisation code"""),
-                                 401)
+        response = make_response(
+            json.dumps('Failed to upgrade the authorization code.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
 
     # Check that the access token is valid.
-
     access_token = credentials.access_token
-    url = \
-        'https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=%s' \
-        % access_token
-    header = httplib2.Http()
-    result = json.loads(header.request(url, 'GET')[1])
-
+    url = ('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=%s'
+           % access_token)
+    h = httplib2.Http()
+    result = json.loads(h.request(url, 'GET')[1])
     # If there was an error in the access token info, abort.
-
     if result.get('error') is not None:
         response = make_response(json.dumps(result.get('error')), 500)
         response.headers['Content-Type'] = 'application/json'
-        return response
 
     # Verify that the access token is used for the intended user.
-
     gplus_id = credentials.id_token['sub']
     if result['user_id'] != gplus_id:
-        response = make_response(json.dumps(
-                            """Token's user ID does not
-                            match given user ID."""),
-                                 401)
+        response = make_response(
+            json.dumps("Token's user ID doesn't match given user ID."), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
 
     # Verify that the access token is valid for this app.
-
     if result['issued_to'] != CLIENT_ID:
-        response = make_response(json.dumps(
-            """Token's client ID
-            does not match app's."""),
-                                 401)
+        response = make_response(
+            json.dumps("Token's client ID does not match app's."), 401)
+        print "Token's client ID does not match app's."
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    stored_access_token = login_session.get('access_token')
+    stored_gplus_id = login_session.get('gplus_id')
+    if stored_access_token is not None and gplus_id == stored_gplus_id:
+        response = make_response(
+            json.dumps('Current user is already connected.'), 200)
         response.headers['Content-Type'] = 'application/json'
         return response
 
     # Store the access token in the session for later use.
-
-    stored_credentials = login_session.get('credentials')
-    stored_gplus_id = login_session.get('gplus_id')
-    if stored_credentials is not None and gplus_id == stored_gplus_id:
-        response = \
-            make_response(json.dumps('Current user is already connected.'),
-                          200)
-        response.headers['Content-Type'] = 'application/json'
-        return response
-
-    login_session['credentials'] = access_token
-    login_session['id'] = gplus_id
+    login_session['access_token'] = credentials.access_token
+    login_session['gplus_id'] = gplus_id
 
     # Get user info
-
-    userinfo_url = 'https://www.googleapis.com/oauth2/v1/userinfo'
-    params = {'access_token': access_token, 'alt': 'json'}
+    userinfo_url = "https://www.googleapis.com/oauth2/v1/userinfo"
+    params = {'access_token': credentials.access_token, 'alt': 'json'}
     answer = requests.get(userinfo_url, params=params)
 
     data = answer.json()
 
-    # ADD PROVIDER TO LOGIN SESSION
-
-    login_session['name'] = data['name']
-    login_session['img'] = data['picture']
+    login_session['username'] = data['name']
     login_session['email'] = data['email']
-    login_session['provider'] = 'google'
-    if not check_user():
-        createUser()
-    return jsonify(name=login_session['name'],
-                   email=login_session['email'],
-                   img=login_session['img'])
+    login_session['image'] = data['image']
 
+    # see if user exists, if it doesn't make a new one
+    user_id = getUserID(login_session['email'])
+    if not user_id:
+        user_id = createUser(login_session)
+    login_session['user_id'] = user_id
 
-# logout user
-
-@app.route('/logout', methods=['post'])
-def logout():
-
-    # Disconnect based on provider
-
-    if login_session.get('provider') == 'google':
-        return gdisconnect()
-    else:
-        response = make_response(json.dumps({'state': 'notConnected'}),
-                                 200)
-        response.headers['Content-Type'] = 'application/json'
-        return response
+    output = ''
+    output += '<h1>Welcome, '
+    output += login_session['username']
+    output += '!</h1>'
+    output += '<img src="'
+    output += login_session['image']
+    output += """
+        " style = "width: 80px; height: 80px;border-radius: 50%;
+         -webkit-border-radius: 50%;-moz-border-radius: 50%;"> '
+         """
+    flash("Welcome, you are now logged in as %s." % login_session['username'], 'success')
+    print "done!"
+    return output
 
 
 @app.route('/gdisconnect')
 def gdisconnect():
-    access_token = login_session['credentials']
-
-    # Only disconnect a connected user.
-
+    """
+    Log out from google.
+    """
+    access_token = login_session['access_token']
+    print 'In gdisconnect access token is %s', access_token
+    print 'User name is: '
+    print login_session['username']
     if access_token is None:
-        response = make_response(json.dumps({'state': 'notConnected'}),
-                                 200)
+        print 'Access Token is None'
+        response = make_response(
+            json.dumps('Current user not connected.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
-    url = 'https://accounts.google.com/o/oauth2/revoke?token=%s' \
-        % access_token
-    header = httplib2.Http()
-    result = header.request(url, 'GET')[0]
-
+    url = ('https://accounts.google.com/o/oauth2/revoke?token=%s'
+           % login_session['access_token'])
+    h = httplib2.Http()
+    result = h.request(url, 'GET')[0]
+    print 'result is '
+    print result
     if result['status'] == '200':
-
-        # Reset the user's session.
-
-        del login_session['credentials']
-        del login_session['id']
-        del login_session['name']
+        del login_session['access_token']
+        del login_session['gplus_id']
+        del login_session['username']
         del login_session['email']
-        del login_session['img']
-        login_session['provider'] = 'null'
-        response = make_response(json.dumps({'state': 'loggedOut'}),
-                                 200)
+        del login_session['image']
+        response = make_response(json.dumps('Successfully disconnected.'), 200)
         response.headers['Content-Type'] = 'application/json'
         return response
     else:
-
-        # if given token is invalid, unable to revoke token
-
-        response = make_response(json.dumps({'state': 'errorRevoke'}),
-                                 200)
+        response = make_response(
+            json.dumps('Failed to revoke token for given user.', 400))
         response.headers['Content-Type'] = 'application/json'
         return response
 
+
+@app.route('/')
+def index():
+    """
+    List all of the categories, and latest movies
+    """
+    categories = session.query(Category).all()
+    latest_movies = session.query(Movies).order_by(Movies.id.desc()).all()
+    return render_template('home.html',
+                           categories=categories,
+                           movies=latest_movies)
+
+
+@app.route('/catalog/<int:category_id>')
+@app.route('/category/<int:category_id>')
+def view_category(category_id):
+    """
+    Show details of selected category
+    """
+    categories = session.query(Category).all()
+    try:
+        category = session.query(Category).filter_by(id=category_id).one()
+    except:
+        flash('Sorry, something went wrong.', 'danger')
+        return redirect(url_for('index'))
+
+    category_movies = session.query(Movies).filter_by(category_id=category.id)
+    return render_template('view_category.html',
+                           categories=categories,
+                           category=category,
+                           movies=category_movies)
+
+
+@app.route('/movie/<int:movie_id>')
+def view_movie(movie_id):
+    """
+    Show details of selected movie
+    """
+    try:
+        movie = session.query(Movies).filter_by(id=movie_id).one()
+    except:
+        flash('Sorry, something went wrong.', 'danger')
+        return redirect(url_for('index'))
+
+    return render_template('view_movie.html',
+                           movie=movie)
+
+
+@app.route('/movie/new', methods=['GET', 'POST'])
+@login_required
+def new_movie():
+    """
+    Allow logged users to create new movie
+    """
+    # # check user logged in
+    # if not user_allowed_to_browse():
+    #     flash('You need to login!', 'danger')
+    #     return redirect(url_for('showLogin'))
+
+    if request.method == 'POST':
+        image_url = str(request.form['image_url'])
+        if image_url == "":
+            image_url = "https://placehold.it/300x200"
+
+        movie = Movies(name=request.form['name'],
+                        description=request.form['description'],
+                        image_url=image_url,
+                        category_id=request.form['category_id'],
+                        user=getUserInfo(login_session['user_id']))
+        session.add(movie)
+        try:
+            session.commit()
+            flash('New movie added!', 'success')
+            return redirect(url_for('view_movie', movie_id=movie.id))
+        except Exception as e:
+            flash('Something went wrong. {}'.format(e), 'danger')
+            return redirect(url_for('index'))
+    else:
+        categories = session.query(Category).all()
+        movie = {
+            'id': None,
+            'name': "",
+            'description': "",
+            'image_url': "",
+            'category_id': None,
+        }
+
+        return render_template('edit_movie.html',
+                               categories=categories,
+                               movie=movie,
+                               form_action=url_for('new_movie'))
+
+
+@app.route('/movie/<int:movie_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_movie(movie_id):
+    """
+    Allow logged users to edit a movie
+    """
+    # # check user logged in
+    # if not user_allowed_to_browse():
+    #     flash('You need to login!', 'danger')
+    #     return redirect(url_for('showLogin'))
+
+    movie = session.query(Movies).filter_by(id=movie_id).one()
+
+    # check user is owner of the item
+    if not user_allowed_to_edit(movie):
+        flash(
+            'You are not authorized to edit this movie, '
+            'but you can always create yours and then edit them if you want.',
+            'danger')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        image_url = str(request.form['image_url'])
+        if image_url == "":
+            image_url = "https://placehold.it/300x200"
+
+        movie.name = request.form['name']
+        movie.description = request.form['description']
+        movie.image_url = image_url
+        movie.category_id = request.form['category_id']
+        session.add(movie)
+        try:
+            session.commit()
+            flash('Update Movies `%s` Successfully.' % movie.name, 'success')
+        except Exception as e:
+            flash('Update Movies `%s` Unsuccessfully. %s' % (movie.name, e), 'danger')
+
+        return redirect(url_for('view_movie', movie_id=movie.id))
+    else:
+        categories = session.query(Category).all()
+
+        return render_template('edit_movie.html',
+                               categories=categories,
+                               movie=movie)
+
+
+@app.route('/movies/<int:movie_id>/delete', methods=['GET', 'POST'])
+@login_required
+def delete_movie(movie_id):
+    """
+    Allow logged users to add a delete
+    """
+    # # check user logged in
+    # if not user_allowed_to_browse():
+    #     flash('You need to login!', 'danger')
+    #     return redirect(url_for('showLogin'))
+
+    movie = session.query(Movies).filter_by(id=movie_id).one()
+
+    # check user is owner of the item
+    if not user_allowed_to_edit(movie):
+        flash(
+            'You are not authorized to edit this movie, '
+            'but you can always create yours and then delete them if you want.',
+            'danger')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        category = session.query(Category).filter_by(id=movie.category_id).one()
+        session.delete(movie)
+        try:
+            session.commit()
+            flash('Delete Movies `%s` Successfully.' % movie.name, 'success')
+            return redirect(url_for('view_category', category_id=category.id))
+        except Exception as e:
+            flash('Something went wrong. {}'.format(e), 'danger')
+            return redirect(url_for('view_movie', movie_id=movie.id))
+    else:
+        return render_template('delete_movie.html', movie=movie)
+
+
+@app.route('/catalog.json')
+@app.route('/categories.json')
+def api_categories():
+    """
+    API JSON Format: List all of the categories
+    """
+    categories = session.query(Category).all()
+    return jsonify(categories=[c.serialize for c in categories])
+
+
+@app.route('/catalog/<int:category_id>/JSON')
+@app.route('/category/<int:category_id>/JSON')
+def api_view_category(category_id):
+    """
+    API JSON Format: Show details of selected category
+    """
+    category = session.query(Category).filter_by(id=category_id).one()
+    return jsonify(category.serialize)
+
+
+@app.route('/movies.json')
+def api_movies():
+    """
+    API JSON Format: List all of the movies
+    """
+    movies = session.query(Movies).all()
+    return jsonify(movies=[c.serialize for c in movies])
+
+
+@app.route('/movie/<int:movie_id>/JSON')
+def api_view_movie(movie_id):
+    """
+    API JSON Format: Show details of selected movie
+    """
+    movie = session.query(Movies).filter_by(id=movie_id).one()
+    return jsonify(movie.serialize)
+
+
 if __name__ == '__main__':
+    app.secret_key = 'secret'
     app.debug = True
-    app.run(host='', port=8000)
+    app.run(host='0.0.0.0', port=8000)

@@ -1,0 +1,66 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "name": "Fantasy",
+      "description": "Fantasy is a genre of fiction set in a fictional universe, often, but not always, without any locations, events, or people referencing the real world. Its roots are in oral traditions, which then developed into literature and drama."
+    },
+    {
+      "id": 2,
+      "name": "Action",
+      "description": "Action film is a genre in which the protagonist or protagonists end up in a series of challenges that typically include violence, extended fighting, physical feats, and frantic chases."
+    },
+    {
+      "id": 3,
+      "name": "Adventure",
+      "description": "Adventure fiction is fiction that usually presents danger, or gives the reader a sense of excitement."
+    },
+    {
+      "id": 4,
+      "name": "Family",
+      "description": "A children's film, or family film, is a film genre that contains children or relates to them in the context of home and family. "
+    },
+    {
+      "id": 5,
+      "name": "Animation",
+      "description": "Animation is a dynamic medium in which images or objects are manipulated to appear as moving images."
+    }
+  ],
+  "movies": [
+    {
+      "id": 1,
+      "name": "Bahubali2",
+      "image_url": "https://upload.wikimedia.org/wikipedia/en/f/f9/Baahubali_the_Conclusion.jpg",
+      "description": "When Shiva, the son of Bahubali, learns about his heritage, he begins to look for answers. His story is juxtaposed with past events that unfolded in the Mahishmati Kingdom.",
+      "category_id": 1
+    },
+    {
+      "id": 2,
+      "name": "300",
+      "description": "King Leonidas of Sparta and a force of 300 men fight the Persians at Thermopylae in 480 B.C.",
+      "image_url": "https://upload.wikimedia.org/wikipedia/en/5/5c/300poster.jpg",
+      "category_id": 2
+    },
+    {
+      "id": 3,
+      "name": "The Great Wall",
+      "description": "European mercenaries searching for black powder become embroiled in the defense of the Great Wall of China against a horde of monstrous creatures.",
+      "image_url": "https://upload.wikimedia.org/wikipedia/en/c/cd/The_Great_Wall_%28film%29.png",
+      "category_id": 3
+    },
+    {
+      "id": 4,
+      "name": "Home Alone",
+      "description": "An eight-year-old troublemaker must protect his house from a pair of burglars when he is accidentally left home alone by his family during Christmas vacation.",
+      "image_url": "https://upload.wikimedia.org/wikipedia/en/7/76/Home_alone_poster.jpg",
+      "category_id": 4
+    },
+    {
+      "id": 5,
+      "name": "Rio",
+      "description": "When Blu, a domesticated macaw from small-town Minnesota, meets the fiercely independent Jewel, he takes off on an adventure to Rio de Janeiro with the bird of his dreams.",
+      "image_url": "https://upload.wikimedia.org/wikipedia/en/b/bb/Rio2011Poster.jpg",
+      "category_id": 5
+    }
+  ]
+}

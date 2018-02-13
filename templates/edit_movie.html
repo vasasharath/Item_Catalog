@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-xs-8 col-xs-offset-2">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    {% if movie.id %}
+                        {{ movie.name }}
+                    {% else %}
+                        Add new Movie
+                    {% endif %}
+                </div>
+                <form action="" method="post">
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <label for="name">Movie Name</label>
+                            <input type="text" name="name" id="name" class="form-control" value="{{ movie.name }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Movie Description</label>
+                            <textarea name="description" id="description" cols="30" rows="5" class="form-control" required>{{ movie.description }}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="thumbnail_url">Image URL</label>
+                            <input type="text" name="image_url" id="image_url" class="form-control" value="{{ movie.image_url }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="category_id">Category</label>
+                            <select name="category_id" id="category_id" class="form-control">
+                                {% for c in categories %}
+                                    <option {% if c.id == movie.category_id %} selected {% endif %} value="{{ c.id }}">{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="panel-footer">
+                        {% if movie.id %}
+                            <a href="{{ url_for('view_movie', movie_id=movie.id) }}" class="btn btn-link">Back</a>
+                            <button type="submit" class="pull-right btn btn-primary">Save</button>
+                        {% else %}
+                            <a href="{{ url_for('index') }}" class="btn btn-link">Back</a>
+                            <button type="submit" class="pull-right btn btn-success">Add new</button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
