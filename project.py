@@ -32,7 +32,7 @@ def createUser(login_session):
     u = User(
         name=login_session['username'],
         email=login_session['email'],
-        image=login_session['image'])
+        picture=login_session['picture'])
     session.add(u)
     session.commit()
     user = session.query(User).filter_by(email=login_session['email']).one()
@@ -48,7 +48,7 @@ def getUserID(email):
     try:
         user = session.query(User).filter_by(email=email).one()
         return user.id
-    except:
+    except BaseException:
         return None
 
 
@@ -162,7 +162,7 @@ def gconnect():
 
     login_session['username'] = data['name']
     login_session['email'] = data['email']
-    login_session['image'] = data['image']
+    login_session['picture'] = data['picture']
 
     # see if user exists, if it doesn't make a new one
     user_id = getUserID(login_session['email'])
@@ -175,12 +175,13 @@ def gconnect():
     output += login_session['username']
     output += '!</h1>'
     output += '<img src="'
-    output += login_session['image']
+    output += login_session['picture']
     output += """
         " style = "width: 80px; height: 80px;border-radius: 50%;
          -webkit-border-radius: 50%;-moz-border-radius: 50%;"> '
          """
-    flash("Welcome, you are now logged in as %s." % login_session['username'], 'success')
+    flash("Welcome, you are now logged in as %s." %
+          login_session['username'], 'success')
     print "done!"
     return output
 
@@ -211,7 +212,7 @@ def gdisconnect():
         del login_session['gplus_id']
         del login_session['username']
         del login_session['email']
-        del login_session['image']
+        del login_session['picture']
         response = make_response(json.dumps('Successfully disconnected.'), 200)
         response.headers['Content-Type'] = 'application/json'
         return response
@@ -243,7 +244,7 @@ def view_category(category_id):
     categories = session.query(Category).all()
     try:
         category = session.query(Category).filter_by(id=category_id).one()
-    except:
+    except BaseException:
         flash('Sorry, something went wrong.', 'danger')
         return redirect(url_for('index'))
 
@@ -261,7 +262,7 @@ def view_movie(movie_id):
     """
     try:
         movie = session.query(Movies).filter_by(id=movie_id).one()
-    except:
+    except BaseException:
         flash('Sorry, something went wrong.', 'danger')
         return redirect(url_for('index'))
 
@@ -286,10 +287,10 @@ def new_movie():
             image_url = "https://placehold.it/300x200"
 
         movie = Movies(name=request.form['name'],
-                        description=request.form['description'],
-                        image_url=image_url,
-                        category_id=request.form['category_id'],
-                        user=getUserInfo(login_session['user_id']))
+                       description=request.form['description'],
+                       image_url=image_url,
+                       category_id=request.form['category_id'],
+                       user=getUserInfo(login_session['user_id']))
         session.add(movie)
         try:
             session.commit()
@@ -349,7 +350,9 @@ def edit_movie(movie_id):
             session.commit()
             flash('Update Movies `%s` Successfully.' % movie.name, 'success')
         except Exception as e:
-            flash('Update Movies `%s` Unsuccessfully. %s' % (movie.name, e), 'danger')
+            flash(
+                'Update Movies `%s` Unsuccessfully. %s' %
+                (movie.name, e), 'danger')
 
         return redirect(url_for('view_movie', movie_id=movie.id))
     else:
@@ -382,7 +385,8 @@ def delete_movie(movie_id):
         return redirect(url_for('index'))
 
     if request.method == 'POST':
-        category = session.query(Category).filter_by(id=movie.category_id).one()
+        category = session.query(Category).filter_by(
+            id=movie.category_id).one()
         session.delete(movie)
         try:
             session.commit()

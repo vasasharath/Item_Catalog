@@ -23,9 +23,9 @@ for t in fixtures['categories']:
 
 for c in fixtures['movies']:
     movie = Movies(name=c['name'],
-                    description=c['description'],
-                    image_url=c['image_url'],
-                    category_id=c['category_id'],
-                    user=current_user)
+                   description=c['description'],
+                   image_url=c['image_url'],
+                   category_id=c['category_id'],
+                   user=current_user)
     session.add(movie)
     session.commit()
